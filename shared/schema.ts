@@ -1,145 +1,89 @@
-import { pgTable, text, serial, integer, numeric, timestamp, json, jsonb, boolean } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { relations } from "drizzle-orm";
 import { z } from "zod";
 
-// User schema (keeping from template for potential auth integration)
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+// User Schema
+export const userSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z.string().email("Invalid email address"),
+  createdAt: z.date().default(() => new Date())
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+// Tweet Schema
+export const tweetSchema = z.object({
+  tweetId: z.string(),
+  content: z.string(),
+  author: z.string(),
+  coinTag: z.string(),
+  sentiment: z.number(),
+  createdAt: z.date().default(() => new Date())
 });
 
-// Adding relationships after all tables are defined
-
-// Tweets from Twitter API with sentiment analysis
-export const tweets = pgTable("tweets", {
-  id: serial("id").primaryKey(),
-  tweetId: text("tweet_id").notNull().unique(),
-  content: text("content").notNull(),
-  authorName: text("author_name").notNull(),
-  authorUsername: text("author_username").notNull(),
-  authorProfileImage: text("author_profile_image"),
-  createdAt: timestamp("created_at").notNull(),
-  likes: integer("likes").default(0),
-  retweets: integer("retweets").default(0),
-  sentimentScore: numeric("sentiment_score").notNull(),
-  sentimentLabel: text("sentiment_label").notNull(),
-  coinSymbol: text("coin_symbol").notNull(),
+// Coin Schema
+export const coinSchema = z.object({
+  name: z.string(),
+  symbol: z.string(),
+  currentPrice: z.number(),
+  priceChangePercentage: z.number(),
+  image: z.string(),
+  isTracked: z.boolean().default(true)
 });
 
-export const insertTweetSchema = createInsertSchema(tweets).omit({
-  id: true,
+// Trade Schema
+export const tradeSchema = z.object({
+  coinId: z.string(),
+  type: z.enum(["BUY", "SELL"]),
+  amount: z.number(),
+  price: z.number(),
+  timestamp: z.date().default(() => new Date())
 });
 
-// Tracked coins
-export const coins = pgTable("coins", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  symbol: text("symbol").notNull().unique(),
-  currentPrice: numeric("current_price"),
-  priceChangePercentage: numeric("price_change_percentage"),
-  image: text("image"),
-  isTracked: boolean("is_tracked").default(true),
+// Config Schema
+export const configSchema = z.object({
+  buyThreshold: z.number().default(0.3),
+  sellThreshold: z.number().default(-0.3),
+  autoTrading: z.boolean().default(false),
+  notifications: z.boolean().default(true),
+  riskLevel: z.enum(["LOW", "MEDIUM", "HIGH"]).default("MEDIUM")
 });
 
-export const insertCoinSchema = createInsertSchema(coins).omit({
-  id: true,
+// Stats Schema
+export const statsSchema = z.object({
+  overallSentiment: z.number().default(0),
+  overallSentimentLabel: z.string().default("Neutral"),
+  activeTrades: z.number().default(0),
+  profitLoss: z.number().default(0),
+  profitLossPercentage: z.number().default(0),
+  trackedCoins: z.number().default(0),
+  lastUpdated: z.date().default(() => new Date())
 });
 
-// Trading logs
-export const trades = pgTable("trades", {
-  id: serial("id").primaryKey(),
-  type: text("type").notNull(), // BUY or SELL
-  coinSymbol: text("coin_symbol").notNull(),
-  amount: numeric("amount").notNull(),
-  price: numeric("price").notNull(),
-  sentimentScore: numeric("sentiment_score").notNull(),
-  threshold: numeric("threshold").notNull(),
-  timestamp: timestamp("timestamp").notNull().defaultNow(),
-});
+// Insert schemas (for creating new records)
+export const insertUserSchema = userSchema.omit({ createdAt: true });
+export const insertTweetSchema = tweetSchema.omit({ createdAt: true });
+export const insertCoinSchema = coinSchema;
+export const insertTradeSchema = tradeSchema.omit({ timestamp: true });
+export const insertConfigSchema = configSchema;
+export const insertStatsSchema = statsSchema.omit({ lastUpdated: true });
 
-export const insertTradeSchema = createInsertSchema(trades).omit({
-  id: true,
-});
+// Types for frontend
+export type User = z.infer<typeof userSchema>;
+export type Tweet = z.infer<typeof tweetSchema>;
+export type Coin = z.infer<typeof coinSchema>;
+export type Trade = z.infer<typeof tradeSchema>;
+export type Config = z.infer<typeof configSchema>;
+export type Stats = z.infer<typeof statsSchema>;
 
-// Configuration for trading settings
-export const configs = pgTable("configs", {
-  id: serial("id").primaryKey(),
-  buyThreshold: numeric("buy_threshold").notNull().default("0.65"),
-  sellThreshold: numeric("sell_threshold").notNull().default("0.40"),
-  autoTrading: boolean("auto_trading").notNull().default(true),
-  notifications: boolean("notifications").notNull().default(true),
-  riskLevel: text("risk_level").notNull().default("Medium"),
-});
-
-export const insertConfigSchema = createInsertSchema(configs).omit({
-  id: true,
-});
-
-// Stats for the dashboard
-export const stats = pgTable("stats", {
-  id: serial("id").primaryKey(),
-  overallSentiment: numeric("overall_sentiment").notNull(),
-  overallSentimentLabel: text("overall_sentiment_label").notNull(),
-  activeTrades: integer("active_trades").notNull(),
-  profitLoss: numeric("profit_loss").notNull(),
-  profitLossPercentage: numeric("profit_loss_percentage").notNull(),
-  trackedCoins: integer("tracked_coins").notNull(),
-  lastUpdated: timestamp("last_updated").notNull().defaultNow(),
-});
-
-export const insertStatsSchema = createInsertSchema(stats).omit({
-  id: true,
-});
-
-// Types for frontend and backend
-export type User = typeof users.$inferSelect;
+// Types for backend
 export type InsertUser = z.infer<typeof insertUserSchema>;
-
-export type Tweet = typeof tweets.$inferSelect;
 export type InsertTweet = z.infer<typeof insertTweetSchema>;
-
-export type Coin = typeof coins.$inferSelect;
 export type InsertCoin = z.infer<typeof insertCoinSchema>;
-
-export type Trade = typeof trades.$inferSelect;
 export type InsertTrade = z.infer<typeof insertTradeSchema>;
-
-export type Config = typeof configs.$inferSelect;
 export type InsertConfig = z.infer<typeof insertConfigSchema>;
-
-export type Stats = typeof stats.$inferSelect;
 export type InsertStats = z.infer<typeof insertStatsSchema>;
 
-// API Response types
+// API Response Types
 export type ApiResponse<T> = {
   success: boolean;
   data?: T;
   error?: string;
 };
-
-// Define table relationships
-export const tweetsRelations = relations(tweets, ({ one }) => ({
-  coin: one(coins, {
-    fields: [tweets.coinSymbol],
-    references: [coins.symbol]
-  })
-}));
-
-export const coinsRelations = relations(coins, ({ many }) => ({
-  tweets: many(tweets),
-  trades: many(trades)
-}));
-
-export const tradesRelations = relations(trades, ({ one }) => ({
-  coin: one(coins, {
-    fields: [trades.coinSymbol],
-    references: [coins.symbol]
-  })
-}));

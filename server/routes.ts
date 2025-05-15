@@ -2,17 +2,24 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { z } from "zod";
-import { storage } from "./db/storage";
+import { DatabaseStorage } from "./storage";
 import { analyzeSentiment } from "./services/sentiment";
 import { fetchTweets } from "./services/twitter";
 import { executeTrade } from "./services/trading";
+import { setupAuth } from "./auth";
 import {
-  insertTweetSchema,
-  insertCoinSchema,
-  insertTradeSchema,
-  insertConfigSchema,
-  insertStatsSchema
+  tweetSchema,
+  coinSchema,
+  tradeSchema,
+  configSchema,
+  statsSchema,
+  type Tweet,
+  type Trade
 } from "@shared/schema";
+import bcrypt from "bcrypt";
+
+// Initialize storage
+const storage = new DatabaseStorage();
 
 // WebSocket connections
 let wsConnections: WebSocket[] = [];
@@ -78,8 +85,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tweets
   app.get('/api/tweets', async (req: Request, res: Response) => {
     try {
-      const coinSymbol = req.query.coinTag as string | undefined;
-      const tweets = await storage.getTweets(50, coinSymbol);
+      const coinTag = req.query.coinTag as string | undefined;
+      const tweets = coinTag 
+        ? await storage.getTweetsByCoin(coinTag)
+        : await storage.getLatestTweets(50);
       res.json(tweets);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -95,27 +104,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Process each tweet
       for (const tweet of fetchedTweets) {
+        if (!tweet.tweetId || !tweet.content || !tweet.authorName || !tweet.coinSymbol || !tweet.createdAt) {
+          console.warn('Skipping invalid tweet:', tweet);
+          continue;
+        }
+
         // Check if tweet already exists
-        const existingTweet = await storage.getTweetByTwitterId(tweet.tweetId);
-        if (existingTweet) continue;
+        const existingTweets = await storage.getTweetsByCoin(tweet.coinSymbol);
+        if (existingTweets.some((t: Tweet) => t.tweetId === tweet.tweetId)) continue;
         
         // Analyze sentiment
-        const { score, label } = await analyzeSentiment(tweet.content);
+        const sentimentResult = await analyzeSentiment(tweet.content);
+        const sentiment = typeof sentimentResult === 'number' ? sentimentResult : sentimentResult.score;
         
         // Store tweet with sentiment analysis
         const newTweet = await storage.createTweet({
-          ...tweet,
-          sentimentScore: score,
-          sentimentLabel: label
+          tweetId: tweet.tweetId,
+          content: tweet.content,
+          author: tweet.authorName,
+          coinTag: tweet.coinSymbol,
+          sentiment,
+          createdAt: tweet.createdAt
         });
         
         // Broadcast new tweet to connected clients
         broadcast({
           type: 'new_tweet',
           tweetId: newTweet.tweetId,
-          coinSymbol: newTweet.coinSymbol,
-          sentimentScore: newTweet.sentimentScore,
-          sentimentLabel: newTweet.sentimentLabel
+          coinTag: newTweet.coinTag,
+          sentiment: newTweet.sentiment
         });
         
         // Check if auto-trading is enabled
@@ -128,20 +145,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Execute trade based on sentiment
           const tradeResult = await executeTrade(
             coin,
-            Number(newTweet.sentimentScore),
-            Number(config.buyThreshold),
-            Number(config.sellThreshold)
+            newTweet.sentiment,
+            config.buyThreshold,
+            config.sellThreshold
           );
           
           if (tradeResult) {
             // Broadcast trade to connected clients
             broadcast({
               type: 'new_trade',
-              tradeId: tradeResult.id,
-              coinSymbol: tradeResult.coinSymbol,
-              tradeType: tradeResult.type,
-              amount: tradeResult.amount,
-              sentimentScore: tradeResult.sentimentScore
+              trade: {
+                coinId: tradeResult.coinSymbol,
+                type: tradeResult.type,
+                amount: tradeResult.amount,
+                price: tradeResult.price,
+                timestamp: tradeResult.timestamp
+              }
             });
           }
         }
@@ -163,7 +182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Coins
   app.get('/api/coins', async (req: Request, res: Response) => {
     try {
-      const coins = await storage.getCoins();
+      const coins = await storage.getTrackedCoins();
       res.json(coins);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -202,18 +221,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.patch('/api/coins/:id', async (req: Request, res: Response) => {
+  app.patch('/api/coins/:symbol', async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const symbol = req.params.symbol;
       
       // Validate the coin exists
-      const coin = await storage.getCoin(id);
+      const coin = await storage.getCoinBySymbol(symbol);
       if (!coin) {
-        return res.status(404).json({ success: false, error: `Coin with ID ${id} not found` });
+        return res.status(404).json({ success: false, error: `Coin with symbol ${symbol} not found` });
       }
       
       // Update the coin with provided data
-      const updatedCoin = await storage.updateCoin(id, req.body);
+      const updatedCoin = await storage.updateCoin(symbol, req.body);
+      if (!updatedCoin) {
+        return res.status(500).json({ success: false, error: 'Failed to update coin' });
+      }
       
       res.json({ success: true, data: updatedCoin });
     } catch (error) {
@@ -225,7 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Trades
   app.get('/api/trades', async (req: Request, res: Response) => {
     try {
-      const trades = await storage.getTrades();
+      const trades = await storage.getLatestTrades(50);
       res.json(trades);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -237,42 +259,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Validate request body
       const tradeData = z.object({
-        coinSymbol: z.string(),
+        coinId: z.string(),
         type: z.enum(['BUY', 'SELL']),
         amount: z.number().positive()
       }).parse(req.body);
       
       // Get coin details
-      const coin = await storage.getCoinBySymbol(tradeData.coinSymbol);
+      const coin = await storage.getCoinBySymbol(tradeData.coinId);
       if (!coin) {
         return res.status(404).json({ 
           success: false, 
-          error: `Coin with symbol ${tradeData.coinSymbol} not found` 
+          error: `Coin with symbol ${tradeData.coinId} not found` 
         });
       }
       
-      // Get config for thresholds
-      const config = await storage.getConfig();
-      
-      // Create a new trade
+      // Create trade
       const newTrade = await storage.createTrade({
-        coinSymbol: tradeData.coinSymbol,
+        coinId: tradeData.coinId,
         type: tradeData.type,
         amount: tradeData.amount,
-        price: Number(coin.currentPrice),
-        sentimentScore: tradeData.type === 'BUY' ? 0.7 : 0.3, // Mock sentiment score
-        threshold: tradeData.type === 'BUY' ? Number(config.buyThreshold) : Number(config.sellThreshold),
+        price: coin.currentPrice,
         timestamp: new Date()
-      });
-      
-      // Broadcast trade to connected clients
-      broadcast({
-        type: 'new_trade',
-        tradeId: newTrade.id,
-        coinSymbol: newTrade.coinSymbol,
-        tradeType: newTrade.type,
-        amount: newTrade.amount,
-        sentimentScore: newTrade.sentimentScore
       });
       
       res.status(201).json({ success: true, data: newTrade });
@@ -282,7 +289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Configuration
+  // Config
   app.get('/api/config', async (req: Request, res: Response) => {
     try {
       const config = await storage.getConfig();
@@ -295,20 +302,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.patch('/api/config', async (req: Request, res: Response) => {
     try {
-      // Validate request body
-      const configData = insertConfigSchema.partial().parse(req.body);
-      
-      // Update config
-      const updatedConfig = await storage.updateConfig(configData);
-      
-      res.json({ success: true, data: updatedConfig });
+      const config = await storage.updateConfig(req.body);
+      res.json(config);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unknown error occurred';
       res.status(500).json({ success: false, error: message });
     }
   });
   
-  // Dashboard stats
+  // Stats
   app.get('/api/stats', async (req: Request, res: Response) => {
     try {
       const stats = await storage.getStats();
@@ -319,30 +321,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  app.patch('/api/stats', async (req: Request, res: Response) => {
+    try {
+      const stats = await storage.updateStats(req.body);
+      res.json(stats);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unknown error occurred';
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+  
+  // User info (dummy implementation, replace with real auth logic if needed)
+  app.get('/api/user', (req: Request, res: Response) => {
+    // If you have authentication, return user info here.
+    // For now, just return a placeholder user or null.
+    res.json({ user: null });
+  });
+  
+  app.post('/api/register', async (req: Request, res: Response) => {
+    const { username, password, email } = req.body;
+    if (!username || !password || !email) {
+      return res.status(400).json({ error: "Username, email, and password are required" });
+    }
+    try {
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername?.(username);
+      if (existingUser) {
+        return res.status(409).json({ error: "User already exists" });
+      }
+      // Hash the password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      // Store the user in the database
+      const newUser = await storage.createUser?.({
+        username,
+        password: hashedPassword,
+        email,
+        createdAt: new Date(),
+      });
+      if (!newUser) {
+        return res.status(500).json({ error: "Failed to create user" });
+      }
+      res.status(201).json({ message: "User registered!", user: { username: newUser.username, email: newUser.email } });
+    } catch (error) {
+      res.status(500).json({ error: "Registration failed", details: error instanceof Error ? error.message : error });
+    }
+  });
+  
+  app.post('/api/login', async (req: Request, res: Response) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: "Username and password are required" });
+    }
+    try {
+      const user = await storage.getUserByUsername?.(username);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (passwordMatch) {
+        req.session.user = { username: user.username, email: user.email };
+        return res.status(200).json({ message: "Login successful", user: { username: user.username, email: user.email } });
+      }
+      return res.status(401).json({ error: "Invalid username or password" });
+    } catch (error) {
+      res.status(500).json({ error: "Login failed", details: error instanceof Error ? error.message : error });
+    }
+  });
+  
   // Helper function to update overall sentiment
   async function updateOverallSentiment() {
     try {
-      // Get all tweets (limit to recent ones)
-      const tweets = await storage.getTweets(100);
-      
+      const tweets = await storage.getLatestTweets(100);
       if (tweets.length === 0) return;
       
-      // Calculate average sentiment
-      const totalSentiment = tweets.reduce((acc, tweet) => acc + Number(tweet.sentimentScore), 0);
+      const totalSentiment = tweets.reduce((sum: number, tweet: Tweet) => sum + tweet.sentiment, 0);
       const averageSentiment = totalSentiment / tweets.length;
       
-      // Determine sentiment label
-      let sentimentLabel = "Neutral";
-      if (averageSentiment >= 0.6) sentimentLabel = "Positive";
-      else if (averageSentiment <= 0.4) sentimentLabel = "Negative";
+      let sentimentLabel = 'Neutral';
+      if (averageSentiment > 0.3) sentimentLabel = 'Positive';
+      else if (averageSentiment < -0.3) sentimentLabel = 'Negative';
       
-      // Update stats
       await storage.updateStats({
         overallSentiment: averageSentiment,
-        overallSentimentLabel: sentimentLabel
+        overallSentimentLabel: sentimentLabel,
+        lastUpdated: new Date()
       });
     } catch (error) {
-      console.error("Error updating overall sentiment:", error);
+      console.error('Error updating overall sentiment:', error);
     }
   }
   

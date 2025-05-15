@@ -1,7 +1,22 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { connectToDatabase } from "./db/mongodb";
+import path from "path";
+import fs from "fs";
+
+import { appConfig } from './config';
+import { connectDB, disconnectDB } from './db';
+
+// Simple logger function
+function log(message: string, source = "express") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
 
 const app = express();
 app.use(express.json());
@@ -37,38 +52,88 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  res.status(status).json({ message });
+  throw err;
+});
+
 (async () => {
-  // Initialize MongoDB connection
-  await connectToDatabase();
-  
-  const server = await registerRoutes(app);
+  try {
+    // Connect to MongoDB
+    await connectDB();
+    
+    // Register API routes
+    const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    // Setup development or production mode
+    if (app.get("env") === "development") {
+      // Simple development server for client files
+      log("Running in development mode - serving client files");
+      // Serve static files from client directory if they exist
+      const clientDir = path.resolve(process.cwd(), "client");
+      if (fs.existsSync(clientDir)) {
+        app.use(express.static(clientDir));
+      }
+      
+      // Fallback route for SPA - serve index.html if it exists
+      const indexHtml = path.resolve(clientDir, "index.html");
+      if (fs.existsSync(indexHtml)) {
+        app.use("*", (_req, res) => {
+          res.sendFile(indexHtml);
+        });
+      }
+    } else {
+      // Production mode - serve from dist/public if it exists
+      const distPath = path.resolve(process.cwd(), "dist/public");
+      if (fs.existsSync(distPath)) {
+        app.use(express.static(distPath));
+        app.use("*", (_req, res) => {
+          res.sendFile(path.resolve(distPath, "index.html"));
+        });
+      }
+    }
 
-    res.status(status).json({ message });
-    throw err;
-  });
+    // Start the server
+    const port = appConfig.server.port;
+    const serverInstance = server.listen(port, () => {
+      log(`Server is running on port ${port}`);
+      log(`Environment: ${appConfig.server.nodeEnv}`);
+    });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+    // Handle server errors
+    serverInstance.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        log(`Port ${port} is already in use. Please try a different port or close the application using this port.`);
+        process.exit(1);
+      } else {
+        log(`Server error: ${error.message}`);
+        process.exit(1);
+      }
+    });
+
+    // Handle process termination
+    process.on('SIGTERM', async () => {
+      log('SIGTERM received. Closing server...');
+      await disconnectDB();
+      serverInstance.close(() => {
+        log('Server closed');
+        process.exit(0);
+      });
+    });
+
+    process.on('SIGINT', async () => {
+      log('SIGINT received. Closing server...');
+      await disconnectDB();
+      serverInstance.close(() => {
+        log('Server closed');
+        process.exit(0);
+      });
+    });
+
+  } catch (error) {
+    log(`Failed to start server: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    process.exit(1);
   }
-
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
 })();

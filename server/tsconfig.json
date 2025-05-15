@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",                        // Supports top-level await & modern syntax
+    "module": "ESNext",                        // Required for native ESM support
+    "moduleResolution": "NodeNext",            // ESM-friendly module resolution
+    "esModuleInterop": true,                   // Allows default imports from CJS
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "outDir": "./dist",                        // Output folder after tsc build
+    "allowImportingTsExtensions": true,        // For imports like './vite.ts'
+    "allowSyntheticDefaultImports": true,
+    "noEmit": true                             // Prevent emitting during dev (used with tsx or esbuild)
+  },
+  "include": ["server", "vite.ts"],            // Adjust based on your file structure
+  "exclude": ["node_modules", "dist"]
+}
