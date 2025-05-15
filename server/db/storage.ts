@@ -1,8 +1,7 @@
-import { 
-  User, Tweet, Coin, Trade, Config, Stats,
+import {
   IUser, ITweet, ICoin, ITrade, IConfig, IStats 
 } from './models';
-import { connectToDatabase } from './mongodb';
+// In-memory storage implementation
 
 // Interface for storage operations
 export interface IStorage {
@@ -41,24 +40,33 @@ export interface IStorage {
   analyzeTweets(): Promise<void>;
 }
 
-// MongoDB storage implementation
-export class MongoStorage implements IStorage {
+// In-memory MongoDB-like storage implementation
+export class MemMongoStorage implements IStorage {
+  private users: Map<string, IUser & { _id: string }> = new Map();
+  private tweets: Map<string, ITweet & { _id: string }> = new Map();
+  private coins: Map<string, ICoin & { _id: string }> = new Map();
+  private trades: Map<string, ITrade & { _id: string }> = new Map();
+  private config: (IConfig & { _id: string }) | null = null;
+  private stats: (IStats & { _id: string }) | null = null;
+  
+  // Counter for generating IDs
+  private idCounter: number = 1;
+  
   constructor() {
-    // Connect to MongoDB when the storage is initialized
-    connectToDatabase();
-    
     // Initialize seed data
     this.initDefaultData();
   }
   
+  // Generate MongoDB-like ID
+  private generateId(): string {
+    return (this.idCounter++).toString().padStart(24, '0');
+  }
+  
   // Initialize default data if needed
   private async initDefaultData() {
-    try {
-      // Check if there are coins in the database
-      const coinCount = await Coin.countDocuments();
-      
+    try {      
       // If no coins, add default coins
-      if (coinCount === 0) {
+      if (this.coins.size === 0) {
         const defaultCoins = [
           {
             name: "Dogecoin",
@@ -86,39 +94,21 @@ export class MongoStorage implements IStorage {
           }
         ];
         
-        await Coin.insertMany(defaultCoins);
+        for (const coin of defaultCoins) {
+          await this.createCoin(coin);
+        }
         console.log('Initialized default coins');
       }
       
-      // Check if there's a config in the database
-      const configCount = await Config.countDocuments();
-      
       // If no config, add default config
-      if (configCount === 0) {
-        await Config.create({
-          buyThreshold: 0.65,
-          sellThreshold: 0.40,
-          autoTrading: true,
-          notifications: true,
-          riskLevel: "Medium"
-        });
+      if (!this.config) {
+        await this.getConfig();
         console.log('Initialized default config');
       }
       
-      // Check if there are stats in the database
-      const statsCount = await Stats.countDocuments();
-      
       // If no stats, add default stats
-      if (statsCount === 0) {
-        await Stats.create({
-          overallSentiment: 0.76,
-          overallSentimentLabel: "Positive",
-          activeTrades: 0,
-          profitLoss: 0,
-          profitLossPercentage: 0,
-          trackedCoins: await Coin.countDocuments({ isTracked: true }),
-          lastUpdated: new Date()
-        });
+      if (!this.stats) {
+        await this.getStats();
         console.log('Initialized default stats');
       }
     } catch (error) {
@@ -128,63 +118,95 @@ export class MongoStorage implements IStorage {
   
   // User methods
   async getUser(id: string): Promise<IUser | null> {
-    return await User.findById(id);
+    return this.users.get(id) || null;
   }
   
   async getUserByUsername(username: string): Promise<IUser | null> {
-    return await User.findOne({ username });
+    for (const user of this.users.values()) {
+      if (user.username === username) {
+        return user;
+      }
+    }
+    return null;
   }
   
   async createUser(user: Partial<IUser>): Promise<IUser> {
-    return await User.create(user);
+    const _id = this.generateId();
+    const newUser = { ...user, _id } as IUser & { _id: string };
+    this.users.set(_id, newUser);
+    return newUser;
   }
   
   // Tweet methods
   async getTweets(limit = 50, coinSymbol?: string): Promise<ITweet[]> {
-    const query = coinSymbol 
-      ? { coinSymbol: coinSymbol }
-      : {};
-      
-    return await Tweet.find(query)
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .exec();
+    let result = Array.from(this.tweets.values());
+    
+    if (coinSymbol) {
+      result = result.filter(tweet => tweet.coinSymbol === coinSymbol);
+    }
+    
+    return result
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limit);
   }
   
   async getTweet(id: string): Promise<ITweet | null> {
-    return await Tweet.findById(id);
+    return this.tweets.get(id) || null;
   }
   
   async getTweetByTwitterId(tweetId: string): Promise<ITweet | null> {
-    return await Tweet.findOne({ tweetId });
+    for (const tweet of this.tweets.values()) {
+      if (tweet.tweetId === tweetId) {
+        return tweet;
+      }
+    }
+    return null;
   }
   
   async createTweet(tweet: Partial<ITweet>): Promise<ITweet> {
-    return await Tweet.create(tweet);
+    const _id = this.generateId();
+    const newTweet = { 
+      ...tweet, 
+      _id,
+      createdAt: tweet.createdAt || new Date()
+    } as ITweet & { _id: string };
+    
+    this.tweets.set(_id, newTweet);
+    return newTweet;
   }
   
   // Coin methods
   async getCoins(): Promise<ICoin[]> {
-    return await Coin.find();
+    return Array.from(this.coins.values());
   }
   
   async getCoin(id: string): Promise<ICoin | null> {
-    return await Coin.findById(id);
+    return this.coins.get(id) || null;
   }
   
   async getCoinBySymbol(symbol: string): Promise<ICoin | null> {
-    // Case-insensitive search
-    return await Coin.findOne({ 
-      symbol: { $regex: new RegExp(`^${symbol}$`, 'i') } 
-    });
+    const upperSymbol = symbol.toUpperCase();
+    for (const coin of this.coins.values()) {
+      if (coin.symbol.toUpperCase() === upperSymbol) {
+        return coin;
+      }
+    }
+    return null;
   }
   
   async createCoin(coin: Partial<ICoin>): Promise<ICoin> {
-    const newCoin = await Coin.create(coin);
+    const _id = this.generateId();
+    const newCoin = { 
+      ...coin, 
+      _id,
+      isTracked: coin.isTracked ?? true 
+    } as ICoin & { _id: string };
     
-    // Update tracked coins count if the new coin is tracked
+    this.coins.set(_id, newCoin);
+    
+    // Update tracked coins count
     if (newCoin.isTracked) {
-      const trackedCoins = await Coin.countDocuments({ isTracked: true });
+      const trackedCoins = Array.from(this.coins.values()).filter(c => c.isTracked).length;
       await this.updateStats({ trackedCoins });
     }
     
@@ -192,38 +214,47 @@ export class MongoStorage implements IStorage {
   }
   
   async updateCoin(id: string, updates: Partial<ICoin>): Promise<ICoin | null> {
-    const coin = await Coin.findByIdAndUpdate(id, updates, { new: true });
+    const coin = this.coins.get(id);
     
     if (!coin) {
       throw new Error(`Coin with ID ${id} not found`);
     }
     
+    const updatedCoin = { ...coin, ...updates };
+    this.coins.set(id, updatedCoin);
+    
     // Update tracked coins count if tracking status changed
-    if ('isTracked' in updates) {
-      const trackedCoins = await Coin.countDocuments({ isTracked: true });
+    if ('isTracked' in updates && updates.isTracked !== coin.isTracked) {
+      const trackedCoins = Array.from(this.coins.values()).filter(c => c.isTracked).length;
       await this.updateStats({ trackedCoins });
     }
     
-    return coin;
+    return updatedCoin;
   }
   
   // Trade methods
   async getTrades(limit = 50): Promise<ITrade[]> {
-    return await Trade.find()
-      .sort({ timestamp: -1 })
-      .limit(limit)
-      .exec();
+    return Array.from(this.trades.values())
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, limit);
   }
   
   async getTrade(id: string): Promise<ITrade | null> {
-    return await Trade.findById(id);
+    return this.trades.get(id) || null;
   }
   
   async createTrade(trade: Partial<ITrade>): Promise<ITrade> {
-    const newTrade = await Trade.create(trade);
+    const _id = this.generateId();
+    const newTrade = { 
+      ...trade, 
+      _id,
+      timestamp: trade.timestamp || new Date() 
+    } as ITrade & { _id: string };
+    
+    this.trades.set(_id, newTrade);
     
     // Update active trades count
-    const activeTrades = await Trade.countDocuments();
+    const activeTrades = this.trades.size;
     await this.updateStats({ activeTrades });
     
     return newTrade;
@@ -231,49 +262,49 @@ export class MongoStorage implements IStorage {
   
   // Config methods
   async getConfig(): Promise<IConfig> {
-    const config = await Config.findOne();
-    
-    if (!config) {
+    if (!this.config) {
       // If no config exists, create a default one
-      return await Config.create({
+      const _id = this.generateId();
+      this.config = {
+        _id,
         buyThreshold: 0.65,
         sellThreshold: 0.40,
         autoTrading: true,
         notifications: true,
         riskLevel: "Medium"
-      });
+      };
     }
     
-    return config;
+    return this.config;
   }
   
   async updateConfig(updates: Partial<IConfig>): Promise<IConfig | null> {
     const config = await this.getConfig();
-    return await Config.findByIdAndUpdate(config._id, updates, { new: true });
+    this.config = { ...config, ...updates };
+    return this.config;
   }
   
   // Stats methods
   async getStats(): Promise<IStats> {
-    const stats = await Stats.findOne();
-    
-    if (!stats) {
+    if (!this.stats) {
       // If no stats exists, create default
-      return await Stats.create({
+      const _id = this.generateId();
+      this.stats = {
+        _id,
         overallSentiment: 0.5,
         overallSentimentLabel: "Neutral",
         activeTrades: 0,
         profitLoss: 0,
         profitLossPercentage: 0,
-        trackedCoins: await Coin.countDocuments({ isTracked: true }),
+        trackedCoins: Array.from(this.coins.values()).filter(c => c.isTracked).length,
         lastUpdated: new Date()
-      });
+      };
+    } else {
+      // Update lastUpdated timestamp
+      this.stats.lastUpdated = new Date();
     }
     
-    // Update lastUpdated timestamp
-    stats.lastUpdated = new Date();
-    await stats.save();
-    
-    return stats;
+    return this.stats;
   }
   
   async updateStats(updates: Partial<IStats>): Promise<IStats | null> {
@@ -282,7 +313,8 @@ export class MongoStorage implements IStorage {
     // Add lastUpdated to updates
     updates.lastUpdated = new Date();
     
-    return await Stats.findByIdAndUpdate(stats._id, updates, { new: true });
+    this.stats = { ...stats, ...updates };
+    return this.stats;
   }
   
   // Analyze tweets
@@ -319,4 +351,4 @@ export class MongoStorage implements IStorage {
 }
 
 // Create and export a singleton instance
-export const storage = new MongoStorage();
+export const storage = new MemMongoStorage();

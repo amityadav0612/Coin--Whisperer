@@ -94,7 +94,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const config = await storage.getConfig();
         if (config.autoTrading) {
           // Get coin details
-          const coin = await storage.getCoinBySymbol(tweet.coinTag);
+          const coin = await storage.getCoinBySymbol(tweet.coinSymbol);
           if (!coin || !coin.isTracked) continue;
           
           // Execute trade based on sentiment
