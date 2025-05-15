@@ -26,7 +26,7 @@ export default function Landing() {
             Coin Whisperer
           </h1>
         </div>
-        <nav className="flex items-center space-x-6">
+        <nav className="hidden sm:flex items-center space-x-6">
           <button 
             onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
             className="text-foreground hover:text-primary transition-colors"
@@ -39,12 +39,30 @@ export default function Landing() {
           >
             Pricing
           </button>
+          <button 
+            onClick={() => document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' })}
+            className="text-foreground hover:text-primary transition-colors"
+          >
+            FAQ
+          </button>
+          <Link href="/auth">
+            <button className="bg-secondary/50 text-foreground px-4 py-2 rounded-lg hover:bg-secondary/70 transition-colors">
+              Log In
+            </button>
+          </Link>
           <Link href="/dashboard">
             <button className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
               Dashboard
             </button>
           </Link>
         </nav>
+        <button className="sm:hidden text-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="4" x2="20" y1="12" y2="12"></line>
+            <line x1="4" x2="20" y1="6" y2="6"></line>
+            <line x1="4" x2="20" y1="18" y2="18"></line>
+          </svg>
+        </button>
       </header>
 
       {/* Hero Section */}
@@ -330,6 +348,60 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* FAQ Section */}
+      <section id="faq" className="py-16 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h3 className="text-2xl md:text-3xl font-bold">
+              Frequently Asked <span className="gradient-text">Questions</span>
+            </h3>
+            <p className="text-muted-foreground mt-4 max-w-xl mx-auto">
+              Get answers to the most common questions about Coin Whisperer.
+            </p>
+          </div>
+          
+          <div className="max-w-3xl mx-auto">
+            {[
+              {
+                question: "How does sentiment analysis work?",
+                answer: "Our advanced AI technology scans thousands of tweets and social media posts in real-time. It uses natural language processing to determine if the sentiment around a specific coin is positive, neutral, or negative. This sentiment score is then used to inform trading decisions."
+              },
+              {
+                question: "Can I customize the trading thresholds?",
+                answer: "Yes! All paid plans allow you to set your own buy and sell thresholds based on sentiment scores. This gives you full control over when trades are executed, allowing you to adjust for your risk tolerance and trading style."
+              },
+              {
+                question: "Which coins does Coin Whisperer support?",
+                answer: "We currently support all major meme coins including Dogecoin, Shiba Inu, Pepe, and dozens more. We're constantly adding new coins based on market trends and user requests."
+              },
+              {
+                question: "Is my data secure?",
+                answer: "Absolutely. We use industry-standard encryption and security protocols to protect your data. We never share your personal information with third parties, and your trading information is always kept confidential."
+              },
+              {
+                question: "Can I cancel my subscription at any time?",
+                answer: "Yes, you can cancel your subscription at any time with no questions asked. We offer a 14-day money-back guarantee for all new subscribers if you're not completely satisfied with our service."
+              },
+              {
+                question: "Do I need any trading experience to use Coin Whisperer?",
+                answer: "No, Coin Whisperer is designed to be user-friendly for traders of all experience levels. Our intuitive dashboard and automated trading options make it easy for beginners, while advanced traders will appreciate the detailed analytics and customization options."
+              }
+            ].map((faq, i) => (
+              <div key={i} className="mb-6 border-b border-border pb-6 last:border-0 last:pb-0">
+                <div className="flex justify-between items-start">
+                  <h4 className="text-lg font-medium mb-2">
+                    {faq.question}
+                  </h4>
+                </div>
+                <p className="text-muted-foreground">
+                  {faq.answer}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Call to action */}
       <section className="bg-gradient-to-r from-primary/10 to-purple-500/10 py-16">
         <div className="container mx-auto px-4 text-center">
@@ -339,11 +411,18 @@ export default function Landing() {
           <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
             Join thousands of traders who are using AI-powered sentiment analysis to gain an edge in the volatile world of meme coins.
           </p>
-          <Link href="/dashboard">
-            <button className="inline-flex items-center justify-center px-8 py-4 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors text-lg">
-              Get Started Now
-            </button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/auth">
+              <button className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors text-lg">
+                Sign Up Now
+              </button>
+            </Link>
+            <Link href="/auth">
+              <button className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-secondary/50 text-foreground rounded-lg font-medium hover:bg-secondary/70 transition-colors text-lg">
+                Log In
+              </button>
+            </Link>
+          </div>
         </div>
       </section>
 
