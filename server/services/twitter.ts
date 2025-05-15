@@ -1,7 +1,9 @@
-import type { InsertTweet } from "@shared/schema";
+import type { ITweet } from "../db/models";
 
 // Mock Twitter data for demonstration purposes
-const mockTweets: Omit<InsertTweet, "sentimentScore" | "sentimentLabel">[] = [
+type MockTweet = Omit<Partial<ITweet>, "sentimentScore" | "sentimentLabel">;
+
+const mockTweets: MockTweet[] = [
   {
     tweetId: "1234567890",
     content: "$DOGE is showing huge potential right now! The community is stronger than ever and with new developments coming, we could see 3x gains soon! 🚀🌙 #Dogecoin #tothemoon",

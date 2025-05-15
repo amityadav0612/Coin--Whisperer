@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { z } from "zod";
-import { storage } from "./storage";
+import { storage } from "./db/storage";
 import { analyzeSentiment } from "./services/sentiment";
 import { fetchTweets } from "./services/twitter";
 import { executeTrade } from "./services/trading";

@@ -1,5 +1,5 @@
-import { storage } from "../storage";
-import type { Coin, InsertTrade, Trade } from "@shared/schema";
+import { storage } from "../db/storage";
+import type { ICoin, ITrade } from "../db/models";
 
 /**
  * Execute a trade based on sentiment analysis
@@ -11,11 +11,11 @@ import type { Coin, InsertTrade, Trade } from "@shared/schema";
  * @returns The executed trade or null if no trade was executed
  */
 export async function executeTrade(
-  coin: Coin,
+  coin: ICoin,
   sentimentScore: number,
   buyThreshold: number,
   sellThreshold: number
-): Promise<Trade | null> {
+): Promise<ITrade | null> {
   // Determine if we should make a trade
   let tradeType: 'BUY' | 'SELL' | null = null;
   
@@ -38,16 +38,16 @@ export async function executeTrade(
   const tradeAmount = baseAmount * sentimentMultiplier;
   
   // Create the trade
-  const trade: InsertTrade = {
+  const tradeData = {
     type: tradeType,
     coinSymbol: coin.symbol,
     amount: tradeAmount,
-    price: Number(coin.currentPrice),
+    price: coin.currentPrice,
     sentimentScore: sentimentScore,
     threshold: tradeType === 'BUY' ? buyThreshold : sellThreshold,
     timestamp: new Date()
   };
   
   // Store the trade
-  return await storage.createTrade(trade);
+  return await storage.createTrade(tradeData);
 }
