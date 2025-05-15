@@ -13,7 +13,7 @@ const mockTweets: MockTweet[] = [
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
     likes: 234,
     retweets: 56,
-    coinTag: "DOGE"
+    coinSymbol: "DOGE"
   },
   {
     tweetId: "2345678901",
@@ -24,7 +24,7 @@ const mockTweets: MockTweet[] = [
     createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
     likes: 43,
     retweets: 12,
-    coinTag: "SHIB"
+    coinSymbol: "SHIB"
   },
   {
     tweetId: "3456789012",
@@ -35,7 +35,7 @@ const mockTweets: MockTweet[] = [
     createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
     likes: 87,
     retweets: 21,
-    coinTag: "PEPE"
+    coinSymbol: "PEPE"
   },
   {
     tweetId: "4567890123",
@@ -46,7 +46,7 @@ const mockTweets: MockTweet[] = [
     createdAt: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
     likes: 129,
     retweets: 45,
-    coinTag: "DOGE"
+    coinSymbol: "DOGE"
   },
   {
     tweetId: "5678901234",
@@ -57,7 +57,7 @@ const mockTweets: MockTweet[] = [
     createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
     likes: 312,
     retweets: 98,
-    coinTag: "SHIB"
+    coinSymbol: "SHIB"
   },
   {
     tweetId: "6789012345",
@@ -68,7 +68,7 @@ const mockTweets: MockTweet[] = [
     createdAt: new Date(Date.now() - 45 * 60 * 1000), // 45 minutes ago
     likes: 56,
     retweets: 14,
-    coinTag: "PEPE"
+    coinSymbol: "PEPE"
   }
 ];
 
@@ -77,7 +77,7 @@ const mockTweets: MockTweet[] = [
  * In a real implementation, this would make calls to the Twitter API
  * For demo purposes, we'll return mock data
  */
-export async function fetchTweets(): Promise<Omit<InsertTweet, "sentimentScore" | "sentimentLabel">[]> {
+export async function fetchTweets(): Promise<MockTweet[]> {
   // For the demo, return mock tweets
   // In a real implementation, this would use the Twitter API client
   
