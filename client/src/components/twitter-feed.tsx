@@ -23,6 +23,11 @@ export default function TwitterFeed({ selectedCoin, onSelectCoin }: TwitterFeedP
     queryKey: ['/api/coins'],
     queryFn: () => API.getCoins(),
   });
+  
+  // Handle coin filter selection
+  const handleCoinSelect = (value: string) => {
+    onSelectCoin(value === "all" ? undefined : value);
+  };
 
   // Format relative time
   function getRelativeTime(timestamp: string) {
@@ -61,14 +66,14 @@ export default function TwitterFeed({ selectedCoin, onSelectCoin }: TwitterFeedP
           <h3 className="text-lg font-medium text-foreground">Twitter Feed</h3>
           <div>
             <Select 
-              value={selectedCoin || ''} 
-              onValueChange={(value) => onSelectCoin(value || undefined)}
+              value={selectedCoin || 'all'} 
+              onValueChange={handleCoinSelect}
             >
               <SelectTrigger className="w-[180px] bg-secondary/20 border-border">
                 <SelectValue placeholder="All tracked coins" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All tracked coins</SelectItem>
+                <SelectItem value="all">All tracked coins</SelectItem>
                 {coins?.map((coin) => (
                   <SelectItem key={coin.symbol} value={coin.symbol}>
                     {coin.symbol}

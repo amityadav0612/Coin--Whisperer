@@ -36,56 +36,44 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         </div>
         <div className="flex flex-col flex-grow px-4 py-4">
           <nav className="flex-1 space-y-2">
-            <Link href="/">
-              <a className={`flex items-center px-4 py-3 rounded-lg group ${
+            <Link href="/" className={`flex items-center px-4 py-3 rounded-lg group ${
                 location === "/" 
                   ? "bg-primary text-primary-foreground" 
                   : "text-muted-foreground hover:bg-accent/50"
               }`}>
                 <span className="material-icons mr-3">dashboard</span>
                 <span>Dashboard</span>
-              </a>
             </Link>
-            <Link href="/trading">
-              <a className="flex items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50 group">
+            <Link href="/trading" className="flex items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50 group">
                 <span className="material-icons mr-3">trending_up</span>
                 <span>Trading</span>
-              </a>
             </Link>
-            <Link href="/coins">
-              <a className="flex items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50 group">
+            <Link href="/coins" className="flex items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50 group">
                 <span className="material-icons mr-3">tag</span>
                 <span>Coins</span>
-              </a>
             </Link>
-            <Link href="/history">
-              <a className="flex items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50 group">
+            <Link href="/history" className="flex items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50 group">
                 <span className="material-icons mr-3">history</span>
                 <span>History</span>
-              </a>
             </Link>
-            <Link href="/analytics">
-              <a className="flex items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50 group">
+            <Link href="/analytics" className="flex items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50 group">
                 <span className="material-icons mr-3">auto_graph</span>
                 <span>Analytics</span>
-              </a>
             </Link>
-            <Link href="/settings">
-              <a className="flex items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50 group">
+            <Link href="/settings" className="flex items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50 group">
                 <span className="material-icons mr-3">settings</span>
                 <span>Settings</span>
-              </a>
             </Link>
           </nav>
           <div className="pt-4 mt-6 border-t border-border">
-            <div className="flex items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50">
+            <button className="flex w-full items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50">
               <span className="material-icons mr-3">account_circle</span>
               <span>Profile</span>
-            </div>
-            <div className="flex items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50">
+            </button>
+            <button className="flex w-full items-center px-4 py-3 text-muted-foreground rounded-lg hover:bg-accent/50">
               <span className="material-icons mr-3">logout</span>
               <span>Logout</span>
-            </div>
+            </button>
           </div>
         </div>
       </div>
