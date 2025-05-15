@@ -31,17 +31,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   
   // Set up WebSocket server
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  const wss = new WebSocketServer({ 
+    server: httpServer, 
+    path: '/ws',
+    // Add CORS support
+    verifyClient: (info, callback) => {
+      // Accept all connections
+      callback(true);
+    }
+  });
+  
+  console.log('WebSocket server set up at /ws path');
   
   wss.on('connection', (ws) => {
+    console.log('New WebSocket connection established');
     wsConnections.push(ws);
+    
+    // Send a welcome message to confirm connection
+    ws.send(JSON.stringify({ type: 'connection', message: 'Connected to WebSocket server' }));
     
     ws.on('message', (message) => {
       console.log('Received message:', message.toString());
+      try {
+        const data = JSON.parse(message.toString());
+        // Process message based on type
+        if (data.type === 'ping') {
+          ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+      }
     });
     
     ws.on('close', () => {
+      console.log('WebSocket connection closed');
       wsConnections = wsConnections.filter(conn => conn !== ws);
+    });
+    
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
     });
   });
   

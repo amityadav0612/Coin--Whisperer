@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { API } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useToast } from "@/hooks/use-toast";
 
@@ -24,7 +25,7 @@ export default function Dashboard() {
         queryClient.invalidateQueries({ queryKey: ['/api/tweets'] });
         toast({
           title: "New tweet detected",
-          description: `New tweet about ${data.coinTag} with sentiment: ${data.sentimentLabel}`,
+          description: `New tweet about ${data.coinSymbol} with sentiment: ${data.sentimentLabel}`,
         });
       } else if (data.type === "new_trade") {
         queryClient.invalidateQueries({ queryKey: ['/api/trades'] });
