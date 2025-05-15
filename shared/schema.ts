@@ -1,5 +1,6 @@
 import { pgTable, text, serial, integer, numeric, timestamp, json, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
+import { relations } from "drizzle-orm";
 import { z } from "zod";
 
 // User schema (keeping from template for potential auth integration)
@@ -14,6 +15,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
 });
 
+// Adding relationships after all tables are defined
+
 // Tweets from Twitter API with sentiment analysis
 export const tweets = pgTable("tweets", {
   id: serial("id").primaryKey(),
@@ -27,7 +30,7 @@ export const tweets = pgTable("tweets", {
   retweets: integer("retweets").default(0),
   sentimentScore: numeric("sentiment_score").notNull(),
   sentimentLabel: text("sentiment_label").notNull(),
-  coinTag: text("coin_tag").notNull(),
+  coinSymbol: text("coin_symbol").notNull(),
 });
 
 export const insertTweetSchema = createInsertSchema(tweets).omit({
@@ -120,3 +123,23 @@ export type ApiResponse<T> = {
   data?: T;
   error?: string;
 };
+
+// Define table relationships
+export const tweetsRelations = relations(tweets, ({ one }) => ({
+  coin: one(coins, {
+    fields: [tweets.coinSymbol],
+    references: [coins.symbol]
+  })
+}));
+
+export const coinsRelations = relations(coins, ({ many }) => ({
+  tweets: many(tweets),
+  trades: many(trades)
+}));
+
+export const tradesRelations = relations(trades, ({ one }) => ({
+  coin: one(coins, {
+    fields: [trades.coinSymbol],
+    references: [coins.symbol]
+  })
+}));

@@ -50,8 +50,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tweets
   app.get('/api/tweets', async (req: Request, res: Response) => {
     try {
-      const coinTag = req.query.coinTag as string | undefined;
-      const tweets = await storage.getTweets(50, coinTag);
+      const coinSymbol = req.query.coinTag as string | undefined;
+      const tweets = await storage.getTweets(50, coinSymbol);
       res.json(tweets);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -85,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         broadcast({
           type: 'new_tweet',
           tweetId: newTweet.tweetId,
-          coinTag: newTweet.coinTag,
+          coinSymbol: newTweet.coinSymbol,
           sentimentScore: newTweet.sentimentScore,
           sentimentLabel: newTweet.sentimentLabel
         });

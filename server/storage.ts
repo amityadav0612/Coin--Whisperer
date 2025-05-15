@@ -4,8 +4,11 @@ import {
   Coin, InsertCoin, 
   Trade, InsertTrade, 
   Config, InsertConfig, 
-  Stats, InsertStats 
+  Stats, InsertStats,
+  users, tweets, coins, trades, configs, stats
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc, like, and, sql } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -284,5 +287,268 @@ export class MemStorage implements IStorage {
   }
 }
 
+// Database storage implementation
+export class DatabaseStorage implements IStorage {
+  // User methods
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  // Tweet methods
+  async getTweets(limit = 50, coinTag?: string): Promise<Tweet[]> {
+    let query = db.select().from(tweets);
+    
+    if (coinTag) {
+      query = query.where(eq(tweets.coinSymbol, coinTag));
+    }
+    
+    return await query.orderBy(desc(tweets.createdAt)).limit(limit);
+  }
+
+  async getTweet(id: number): Promise<Tweet | undefined> {
+    const [tweet] = await db.select().from(tweets).where(eq(tweets.id, id));
+    return tweet;
+  }
+
+  async getTweetByTwitterId(tweetId: string): Promise<Tweet | undefined> {
+    const [tweet] = await db.select().from(tweets).where(eq(tweets.tweetId, tweetId));
+    return tweet;
+  }
+
+  async createTweet(insertTweet: InsertTweet): Promise<Tweet> {
+    const [tweet] = await db.insert(tweets).values(insertTweet).returning();
+    return tweet;
+  }
+
+  // Coin methods
+  async getCoins(): Promise<Coin[]> {
+    return await db.select().from(coins);
+  }
+
+  async getCoin(id: number): Promise<Coin | undefined> {
+    const [coin] = await db.select().from(coins).where(eq(coins.id, id));
+    return coin;
+  }
+
+  async getCoinBySymbol(symbol: string): Promise<Coin | undefined> {
+    const [coin] = await db.select().from(coins).where(
+      eq(sql`UPPER(${coins.symbol})`, symbol.toUpperCase())
+    );
+    return coin;
+  }
+
+  async createCoin(insertCoin: InsertCoin): Promise<Coin> {
+    const [coin] = await db.insert(coins).values(insertCoin).returning();
+    
+    // Update tracked coins count if the new coin is tracked
+    if (coin.isTracked) {
+      const trackedCoins = await this.getTrackedCoinsCount();
+      await this.updateStats({ trackedCoins });
+    }
+    
+    return coin;
+  }
+
+  async updateCoin(id: number, updates: Partial<Coin>): Promise<Coin> {
+    const [updatedCoin] = await db
+      .update(coins)
+      .set(updates)
+      .where(eq(coins.id, id))
+      .returning();
+    
+    if (!updatedCoin) {
+      throw new Error(`Coin with ID ${id} not found`);
+    }
+    
+    // Update tracked coins count if tracking status changed
+    if ('isTracked' in updates) {
+      const trackedCoins = await this.getTrackedCoinsCount();
+      await this.updateStats({ trackedCoins });
+    }
+    
+    return updatedCoin;
+  }
+
+  // Helper method to count tracked coins
+  private async getTrackedCoinsCount(): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(coins)
+      .where(eq(coins.isTracked, true));
+    
+    return result[0]?.count || 0;
+  }
+
+  // Trade methods
+  async getTrades(limit = 50): Promise<Trade[]> {
+    return await db
+      .select()
+      .from(trades)
+      .orderBy(desc(trades.timestamp))
+      .limit(limit);
+  }
+
+  async getTrade(id: number): Promise<Trade | undefined> {
+    const [trade] = await db.select().from(trades).where(eq(trades.id, id));
+    return trade;
+  }
+
+  async createTrade(insertTrade: InsertTrade): Promise<Trade> {
+    const [trade] = await db.insert(trades).values(insertTrade).returning();
+    
+    // Update active trades count
+    const activeTrades = await this.getTradesCount();
+    await this.updateStats({ activeTrades });
+    
+    return trade;
+  }
+
+  // Helper method to count trades
+  private async getTradesCount(): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(trades);
+    
+    return result[0]?.count || 0;
+  }
+
+  // Config methods
+  async getConfig(): Promise<Config> {
+    const [config] = await db.select().from(configs);
+    
+    if (!config) {
+      // If no config exists, create a default one
+      return this.createDefaultConfig();
+    }
+    
+    return config;
+  }
+  
+  private async createDefaultConfig(): Promise<Config> {
+    const defaultConfig: InsertConfig = {
+      buyThreshold: 0.65,
+      sellThreshold: 0.40,
+      autoTrading: true,
+      notifications: true,
+      riskLevel: "Medium"
+    };
+    
+    const [config] = await db.insert(configs).values(defaultConfig).returning();
+    return config;
+  }
+
+  async updateConfig(updates: Partial<Config>): Promise<Config> {
+    // Get existing config or create default
+    const existingConfig = await this.getConfig();
+    
+    // Update the config
+    const [updatedConfig] = await db
+      .update(configs)
+      .set(updates)
+      .where(eq(configs.id, existingConfig.id))
+      .returning();
+    
+    return updatedConfig;
+  }
+
+  // Stats methods
+  async getStats(): Promise<Stats> {
+    const [statsData] = await db.select().from(stats);
+    
+    if (!statsData) {
+      // If no stats exists, create default
+      return this.createDefaultStats();
+    }
+    
+    // Update lastUpdated timestamp
+    const [updatedStats] = await db
+      .update(stats)
+      .set({ lastUpdated: new Date() })
+      .where(eq(stats.id, statsData.id))
+      .returning();
+    
+    return updatedStats;
+  }
+  
+  private async createDefaultStats(): Promise<Stats> {
+    const defaultStats: InsertStats = {
+      overallSentiment: 0.5,
+      overallSentimentLabel: "Neutral",
+      activeTrades: 0,
+      profitLoss: 0,
+      profitLossPercentage: 0,
+      trackedCoins: 0,
+      lastUpdated: new Date()
+    };
+    
+    const [statsData] = await db.insert(stats).values(defaultStats).returning();
+    return statsData;
+  }
+
+  async updateStats(updates: Partial<Stats>): Promise<Stats> {
+    // Get existing stats or create default
+    const existingStats = await this.getStats();
+    
+    // Add lastUpdated to updates
+    const updatesWithTimestamp = {
+      ...updates,
+      lastUpdated: new Date()
+    };
+    
+    // Update the stats
+    const [updatedStats] = await db
+      .update(stats)
+      .set(updatesWithTimestamp)
+      .where(eq(stats.id, existingStats.id))
+      .returning();
+    
+    return updatedStats;
+  }
+
+  // Analyze tweets
+  async analyzeTweets(): Promise<void> {
+    // This would analyze tweets and update sentiment scores
+    // In a real implementation, this would use NLP services
+    console.log("Tweet analysis completed");
+    
+    // Update overall sentiment based on recent tweets
+    await this.updateOverallSentiment();
+  }
+  
+  private async updateOverallSentiment(): Promise<void> {
+    const recentTweets = await this.getTweets(100);
+    
+    if (recentTweets.length === 0) return;
+    
+    // Calculate average sentiment
+    const totalSentiment = recentTweets.reduce(
+      (acc, tweet) => acc + Number(tweet.sentimentScore), 0
+    );
+    const averageSentiment = totalSentiment / recentTweets.length;
+    
+    // Determine sentiment label
+    let sentimentLabel = "Neutral";
+    if (averageSentiment >= 0.6) sentimentLabel = "Positive";
+    else if (averageSentiment <= 0.4) sentimentLabel = "Negative";
+    
+    // Update stats
+    await this.updateStats({
+      overallSentiment: averageSentiment,
+      overallSentimentLabel: sentimentLabel
+    });
+  }
+}
+
 // Create and export a singleton instance
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
