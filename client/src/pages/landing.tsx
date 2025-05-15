@@ -26,11 +26,23 @@ export default function Landing() {
             Coin Whisperer
           </h1>
         </div>
-        <nav>
+        <nav className="flex items-center space-x-6">
+          <button 
+            onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+            className="text-foreground hover:text-primary transition-colors"
+          >
+            Features
+          </button>
+          <button 
+            onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+            className="text-foreground hover:text-primary transition-colors"
+          >
+            Pricing
+          </button>
           <Link href="/dashboard">
-            <a className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+            <button className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
               Dashboard
-            </a>
+            </button>
           </Link>
         </nav>
       </header>
@@ -55,16 +67,16 @@ export default function Landing() {
             
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/dashboard">
-                <a className="inline-flex items-center justify-center px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors">
+                <button className="inline-flex items-center justify-center px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors">
                   Get Started
                   <svg className="ml-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
-                </a>
+                </button>
               </Link>
-              <a href="#features" className="inline-flex items-center justify-center px-6 py-3 bg-secondary/50 text-foreground rounded-lg font-medium hover:bg-secondary/70 transition-colors">
+              <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className="inline-flex items-center justify-center px-6 py-3 bg-secondary/50 text-foreground rounded-lg font-medium hover:bg-secondary/70 transition-colors">
                 Learn More
-              </a>
+              </button>
             </div>
           </div>
 
@@ -186,6 +198,138 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Pricing Section */}
+      <section id="pricing" className="py-16 bg-background/80">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h3 className="text-2xl md:text-3xl font-bold">
+              Choose the Perfect <span className="gradient-text">Plan</span> for You
+            </h3>
+            <p className="text-muted-foreground mt-4 max-w-xl mx-auto">
+              Select a plan that best fits your trading style and investment goals.
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {/* Basic Plan */}
+            <div className="bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+              <div className="p-6">
+                <h4 className="text-lg font-medium mb-1">Basic</h4>
+                <div className="flex items-baseline">
+                  <span className="text-3xl font-bold">$9</span>
+                  <span className="text-muted-foreground ml-1">/month</span>
+                </div>
+                <p className="text-muted-foreground mt-4 mb-6">Perfect for beginners looking to get started with sentiment-based trading.</p>
+                
+                <ul className="space-y-3 mb-6">
+                  {[
+                    "Real-time sentiment analysis",
+                    "5 coins tracked simultaneously",
+                    "Daily trading signals",
+                    "Basic dashboard access",
+                  ].map((feature, i) => (
+                    <li key={i} className="flex items-center">
+                      <svg className="h-5 w-5 text-primary mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                
+                <Link href="/dashboard">
+                  <button className="w-full py-3 bg-secondary/50 hover:bg-secondary/70 text-foreground rounded-lg font-medium transition-colors">
+                    Get Started
+                  </button>
+                </Link>
+              </div>
+            </div>
+            
+            {/* Pro Plan - Highlighted */}
+            <div className="bg-card border-2 border-primary rounded-xl overflow-hidden shadow-lg relative transform hover:-translate-y-2 transition-all duration-300">
+              <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-bold uppercase py-1 px-3 rounded-bl-lg">
+                Most Popular
+              </div>
+              <div className="p-6 pt-8">
+                <h4 className="text-lg font-medium mb-1">Pro</h4>
+                <div className="flex items-baseline">
+                  <span className="text-3xl font-bold">$29</span>
+                  <span className="text-muted-foreground ml-1">/month</span>
+                </div>
+                <p className="text-muted-foreground mt-4 mb-6">Advanced features for serious traders looking to maximize profits.</p>
+                
+                <ul className="space-y-3 mb-6">
+                  {[
+                    "Everything in Basic",
+                    "Unlimited coins tracked",
+                    "Automated trading execution",
+                    "Advanced sentiment indicators",
+                    "24/7 real-time alerts",
+                    "Historical sentiment data",
+                  ].map((feature, i) => (
+                    <li key={i} className="flex items-center">
+                      <svg className="h-5 w-5 text-primary mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                
+                <Link href="/dashboard">
+                  <button className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-medium transition-colors">
+                    Get Started
+                  </button>
+                </Link>
+              </div>
+            </div>
+            
+            {/* Premium Plan */}
+            <div className="bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+              <div className="p-6">
+                <h4 className="text-lg font-medium mb-1">Enterprise</h4>
+                <div className="flex items-baseline">
+                  <span className="text-3xl font-bold">$99</span>
+                  <span className="text-muted-foreground ml-1">/month</span>
+                </div>
+                <p className="text-muted-foreground mt-4 mb-6">Complete solution for professional traders and institutions.</p>
+                
+                <ul className="space-y-3 mb-6">
+                  {[
+                    "Everything in Pro",
+                    "Custom sentiment algorithms",
+                    "API access for custom integrations",
+                    "Dedicated account manager",
+                    "Priority support",
+                    "Custom whitelabel solution",
+                    "Team collaboration features",
+                  ].map((feature, i) => (
+                    <li key={i} className="flex items-center">
+                      <svg className="h-5 w-5 text-primary mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                
+                <Link href="/dashboard">
+                  <button className="w-full py-3 bg-secondary/50 hover:bg-secondary/70 text-foreground rounded-lg font-medium transition-colors">
+                    Contact Sales
+                  </button>
+                </Link>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-12 text-center">
+            <p className="text-muted-foreground">
+              All plans include a 14-day free trial. No credit card required to start.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Call to action */}
       <section className="bg-gradient-to-r from-primary/10 to-purple-500/10 py-16">
         <div className="container mx-auto px-4 text-center">
@@ -196,9 +340,9 @@ export default function Landing() {
             Join thousands of traders who are using AI-powered sentiment analysis to gain an edge in the volatile world of meme coins.
           </p>
           <Link href="/dashboard">
-            <a className="inline-flex items-center justify-center px-8 py-4 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors text-lg">
+            <button className="inline-flex items-center justify-center px-8 py-4 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors text-lg">
               Get Started Now
-            </a>
+            </button>
           </Link>
         </div>
       </section>
